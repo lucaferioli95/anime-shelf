@@ -103,7 +103,7 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
   <div class="add" id="add">
     <div class="addrow">
       <div class="seg" id="typeSeg"><button type="button" data-t="anime" class="on">Anime</button><button type="button" data-t="manga">Manga</button></div>
-      <div class="seg seg2" id="stSeg"><button type="button" data-st="rated" class="on">Seen it</button><button type="button" data-st="towatch">To watch / read</button></div>
+      <div class="seg seg2" id="stSeg"><button type="button" data-st="rated" class="on" title="Finished">✓ Done</button><button type="button" data-st="watching" title="Watching or reading now">▶ Now</button><button type="button" data-st="towatch" title="Want to watch or read later">+ Later</button></div>
     </div>
     <div class="addrow">
       <input class="inp" id="nameIn" placeholder="Name of the anime or manga…" autocomplete="off" style="flex:1;min-width:180px">
@@ -117,7 +117,7 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
     <datalist id="whereList"></datalist>
     <div class="sugg" id="sugg" hidden></div>
   </div>
-  <div class="tabs" id="tabs"><button type="button" class="tab on" data-tab="rated">Shelf<span id="nRated"></span></button><button type="button" class="tab" data-tab="towatch">To watch / read<span id="nTo"></span></button></div>
+  <div class="tabs" id="tabs"><button type="button" class="tab on" data-tab="rated" title="Finished">✓ Done<span id="nRated"></span></button><button type="button" class="tab" data-tab="watching" title="Watching or reading now">▶ Now<span id="nNow"></span></button><button type="button" class="tab" data-tab="towatch" title="To watch or read later">+ Later<span id="nTo"></span></button></div>
   <div class="filters">
     <button type="button" class="pill on" data-ty="all">All</button><button type="button" class="pill" data-ty="anime">Anime</button><button type="button" class="pill" data-ty="manga">Manga</button>
     <span style="width:8px"></span>
@@ -134,7 +134,7 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
 <script src="install.js"></script>
 <script src="supabase.js"></script>
 <script>
-var APP_VERSION = '2.1.0';
+var APP_VERSION = '2.2.0';
 var $ = function(id){ return document.getElementById(id); };
 $('ver').textContent = 'v' + APP_VERSION; $('ver2').textContent = APP_VERSION;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
@@ -179,7 +179,7 @@ async function searchCovers(q, type){
 /* ---------- add form ---------- */
 function segClick(id, attr, key, after){ $(id).addEventListener('click', function(e){ var b = e.target.closest('button'); if (!b) return; ui[key] = b.dataset[attr]; Array.prototype.forEach.call($(id).children, function(x){ x.classList.toggle('on', x === b); }); if (after) after(); }); }
 segClick('typeSeg', 't', 'type', function(){ ui.pick = null; $('pickCov').hidden = true; suggest(); });
-segClick('stSeg', 'st', 'status', function(){ $('addScores').style.display = ui.status === 'towatch' ? 'none' : ''; });
+segClick('stSeg', 'st', 'status', function(){ $('addScores').style.display = ui.status === 'rated' ? '' : 'none'; });
 $('addScores').addEventListener('click', function(e){ var b = e.target.closest('.sc'); if (!b) return; ui.score = ui.score === b.dataset.s ? '' : b.dataset.s; paintScores(); });
 function paintScores(){ Array.prototype.forEach.call($('addScores').children, function(x){ x.classList.toggle('on', x.dataset.s === ui.score); }); }
 var sgTimer = null, sgSeq = 0;
@@ -234,13 +234,14 @@ function shown(){
 function render(){
   var l = shown();
   $('nRated').textContent = S.items.filter(function(r){ return r.status === 'rated'; }).length;
+  $('nNow').textContent = S.items.filter(function(r){ return r.status === 'watching'; }).length;
   $('nTo').textContent = S.items.filter(function(r){ return r.status === 'towatch'; }).length;
   var by = $('by'), cur = ui.by;
   by.innerHTML = '<option value="all">Added by: anyone</option>' + Object.keys(S.people).map(function(e){ return '<option value="' + esc(e) + '">' + esc(S.people[e]) + '</option>'; }).join(''); by.value = cur;
   $('list').innerHTML = l.length ? l.map(function(r){
     var mine = myScore(r);
     var others = Object.keys(r.scores).filter(function(e){ return e !== S.me; }).map(function(e){ return '<span class="oth" title="' + esc(nameOf(e)) + '\'s score">' + esc(nameOf(e)) + ' <b class="' + esc(r.scores[e]) + '">' + esc(r.scores[e]) + '</b></span>'; }).join('');
-    var right = r.status === 'towatch' ? '<button type="button" class="watched" data-a="watched">Done ✓</button>' : '<div class="scoreblock"><button type="button" class="chip ' + esc(mine) + '" data-a="score" title="Tap to set your score">' + (mine || '?') + '</button>' + others + '</div>';
+    var right = r.status === 'towatch' ? '<button type="button" class="watched" data-a="start">▶ Start</button>' : r.status === 'watching' ? '<button type="button" class="watched" data-a="watched">Done ✓</button>' : '<div class="scoreblock"><button type="button" class="chip ' + esc(mine) + '" data-a="score" title="Tap to set your score">' + (mine || '?') + '</button>' + others + '</div>';
     return '<div class="row t-' + esc(r.type) + '" data-id="' + esc(r.id) + '"><button type="button" class="cov" data-a="cover" title="Change cover">' + (r.cover ? '<img class="cov" src="' + esc(r.cover) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : '<span class="cov" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center">no cover</span>') + '</button>' +
       '<div class="info"><input class="nm" data-f="name" value="' + esc(r.name) + '"><div class="meta">' + (r.type === 'manga' ? 'Manga' : 'Anime') + (r.year ? ' · ' + esc(r.year) : '') + ' · added by ' + esc(nameOf(r.added_by)) + '</div></div>' + right +
       '<input class="wh" data-f="where" list="whereList" placeholder="Where to watch" value="' + esc(r.where || '') + '">' +
@@ -255,6 +256,9 @@ $('list').addEventListener('click', async function(e){
     if (nx) r.scores[S.me] = nx; else delete r.scores[S.me]; cacheSave(); render();
     var q = nx ? await sb.from('shelf_scores').upsert({item_id: r.id, user_email: S.me, score: nx, updated_at: new Date().toISOString()}) : await sb.from('shelf_scores').delete().eq('item_id', r.id).eq('user_email', S.me);
     if (q.error){ toast('Could not save the score: ' + q.error.message, 5000); refresh(); }
+  } else if (b.dataset.a === 'start'){
+    r.status = 'watching'; cacheSave(); setTab('watching'); toast('Moved to Now.');
+    var q4 = await sb.from('shelf_items').update({status: 'watching', updated_at: new Date().toISOString()}).eq('id', r.id); if (q4.error){ toast('Could not save: ' + q4.error.message, 5000); refresh(); }
   } else if (b.dataset.a === 'watched'){
     r.status = 'rated'; cacheSave(); setTab('rated'); toast('Moved to the shelf. Tap the ? to give your score.');
     var q2 = await sb.from('shelf_items').update({status: 'rated', updated_at: new Date().toISOString()}).eq('id', r.id); if (q2.error){ toast('Could not save: ' + q2.error.message, 5000); refresh(); }

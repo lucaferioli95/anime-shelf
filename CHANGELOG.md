@@ -2,6 +2,10 @@
 
 All notable changes to Anime Shelf, newest first. The version number is also shown in the app header.
 
+## 2.2.0 - 2026-11-03
+- New "Now" category for what you are currently watching or reading. The three groups use short labels with symbols so they fit on a phone: ✓ Done (finished, with scores), ▶ Now (in progress) and + Later (to watch or read in the future).
+- Move titles along as you go: "▶ Start" on a Later title moves it to Now, and "Done ✓" on a Now title moves it to Done, where you give your score.
+
 ## 2.1.0 - 2026-11-03
 - Anime and manga now have different row colours so you can tell them apart at a glance: a soft blue with a blue edge for anime, a soft warm orange with an orange edge for manga (darker versions in dark mode).
 
