@@ -74,6 +74,19 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:30;max-width:90vw}
 .foot{max-width:980px;margin:0 auto;color:var(--muted);font-size:12px;padding:0 16px 24px}
 .foot a{color:inherit}
+.tabs{display:flex;gap:4px;margin:12px 0 0;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:3px solid transparent;padding:9px 14px;font-weight:700;color:var(--muted)}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+.tab span{font-weight:500;opacity:.7;margin-left:4px}
+.sc.sm{width:auto;padding:0 10px;font-weight:700;font-size:13px}
+.seg2 button.on{background:var(--accent);color:#fff}
+.scoreblock{display:flex;flex-direction:column;gap:4px;align-items:center}
+.oth{font-size:11px;color:var(--muted);display:flex;gap:4px;align-items:center;white-space:nowrap}
+.oth b{display:inline-flex;width:18px;height:18px;border-radius:5px;align-items:center;justify-content:center;color:#fff;font-size:11px}
+.oth b.S{background:var(--S);color:#2b1d00}.oth b.A{background:var(--A)}.oth b.B{background:var(--B)}.oth b.C{background:var(--C)}
+.watched{border:1px solid var(--accent);background:none;color:var(--accent);border-radius:10px;padding:8px 10px;font-weight:700;font-size:13px}
+.gate{max-width:420px;margin:60px auto;padding:24px;text-align:center;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.gate p{color:var(--muted)}
 .syncui{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
 </style>
 </head>
@@ -83,10 +96,14 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
   <span class="syncui sp" id="syncUi"></span>
   <button type="button" class="linkbtn" id="installBtn">Install app</button>
 </header>
-<main>
+<div class="gate" id="gate" hidden></div>
+<main id="app" hidden>
   <div class="add" id="add">
     <div class="addrow">
       <div class="seg" id="typeSeg"><button type="button" data-t="anime" class="on">Anime</button><button type="button" data-t="manga">Manga</button></div>
+      <div class="seg seg2" id="stSeg"><button type="button" data-st="rated" class="on">Seen it</button><button type="button" data-st="towatch">To watch / read</button></div>
+    </div>
+    <div class="addrow">
       <input class="inp" id="nameIn" placeholder="Name of the anime or manga…" autocomplete="off" style="flex:1;min-width:180px">
       <img id="pickCov" class="cov" alt="" hidden style="width:32px;height:44px">
     </div>
@@ -98,12 +115,14 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
     <datalist id="whereList"></datalist>
     <div class="sugg" id="sugg" hidden></div>
   </div>
+  <div class="tabs" id="tabs"><button type="button" class="tab on" data-tab="rated">Shelf<span id="nRated"></span></button><button type="button" class="tab" data-tab="towatch">To watch / read<span id="nTo"></span></button></div>
   <div class="filters">
     <button type="button" class="pill on" data-ty="all">All</button><button type="button" class="pill" data-ty="anime">Anime</button><button type="button" class="pill" data-ty="manga">Manga</button>
     <span style="width:8px"></span>
     <button type="button" class="pill on" data-sc="all">Any score</button><button type="button" class="pill" data-sc="S">S</button><button type="button" class="pill" data-sc="A">A</button><button type="button" class="pill" data-sc="B">B</button><button type="button" class="pill" data-sc="C">C</button>
-    <input type="search" class="inp" id="q" placeholder="Search…" style="max-width:170px;margin-left:auto">
-    <select class="inp" id="sort"><option value="score">Sort: score</option><option value="name">Sort: name</option><option value="new">Sort: newest</option></select>
+    <input type="search" class="inp" id="q" placeholder="Search…" style="max-width:150px;margin-left:auto">
+    <select class="inp" id="by"><option value="all">Added by: anyone</option></select>
+    <select class="inp" id="sort"><option value="score">Sort: my score</option><option value="name">Sort: name</option><option value="new">Sort: newest</option></select>
   </div>
   <div class="list" id="list"></div>
 </main>
@@ -113,23 +132,23 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
 <script src="install.js"></script>
 <script src="supabase.js"></script>
 <script>
-var APP_VERSION = '1.0.0';
+var APP_VERSION = '2.0.0';
 var $ = function(id){ return document.getElementById(id); };
 $('ver').textContent = 'v' + APP_VERSION; $('ver2').textContent = APP_VERSION;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
-function uid(){ return Math.random().toString(36).slice(2,10); }
 function toast(t, ms){ var e = $('toast'); e.textContent = t; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function(){ e.hidden = true; }, ms || 3000); }
 var PLACES = ['Crunchyroll','Netflix','Disney+','Prime Video','Hulu','HIDIVE','Max','Apple TV+','YouTube','MANGA Plus','Webtoon','VIZ','Kindle','Physical copy','Not available'];
 $('whereList').innerHTML = PLACES.map(function(p){ return '<option value="' + esc(p) + '">'; }).join('');
 
-/* ---------- data ---------- */
-var KEY = 'anime-shelf-v1';
-var db = {rows: [], del: {}};
-var ui = {type: 'anime', score: '', filterType: 'all', filterScore: 'all', q: '', sort: 'score', pick: null};
-try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv && sv.rows) db = {rows: sv.rows, del: sv.del || {}}; } catch(e){}
-function save(){ try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){ toast('Could not save on this device'); } syncSoon(); }
-function touch(r){ r.t = Date.now(); }
+/* ---------- state ---------- */
+var CACHE_KEY = 'anime-shelf-cache-v2', OLD_KEY = 'anime-shelf-v1', MIGRATED = 'anime-shelf-migrated';
+var S = {me: '', people: {}, items: []};
+var ui = {type: 'anime', status: 'rated', score: '', tab: 'rated', filterType: 'all', filterScore: 'all', by: 'all', q: '', sort: 'score', pick: null};
+try { var c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c && c.items){ S.items = c.items; S.people = c.people || {}; S.me = c.me || ''; } } catch(e){}
+function cacheSave(){ try { localStorage.setItem(CACHE_KEY, JSON.stringify({items: S.items, people: S.people, me: S.me})); } catch(e){} }
+function nameOf(email){ return S.people[email] || (email || '?').split('@')[0]; }
+function newId(){ return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
 /* ---------- cover search: AniList, then Jikan ---------- */
 var ALQ = 'query($s:String,$t:MediaType){Page(perPage:8){media(search:$s,type:$t,sort:SEARCH_MATCH){id title{romaji english} coverImage{large medium} seasonYear startDate{year} format}}}';
@@ -150,13 +169,15 @@ async function searchCovers(q, type){
   q = q.trim(); if (q.length < 2) return [];
   var k = type + '|' + q.toLowerCase(); if (cache[k]) return cache[k];
   var out;
-  try { out = await searchAniList(q, type); } catch(e){ try { out = await searchJikan(q, type); } catch(e2){ throw e2; } }
+  try { out = await searchAniList(q, type); } catch(e){ out = await searchJikan(q, type); }
   if (!out.length){ try { out = await searchJikan(q, type); } catch(e){} }
   return (cache[k] = out || []);
 }
 
 /* ---------- add form ---------- */
-$('typeSeg').addEventListener('click', function(e){ var b = e.target.closest('button'); if (!b) return; ui.type = b.dataset.t; ui.pick = null; $('pickCov').hidden = true; Array.prototype.forEach.call($('typeSeg').children, function(x){ x.classList.toggle('on', x === b); }); suggest(); });
+function segClick(id, attr, key, after){ $(id).addEventListener('click', function(e){ var b = e.target.closest('button'); if (!b) return; ui[key] = b.dataset[attr]; Array.prototype.forEach.call($(id).children, function(x){ x.classList.toggle('on', x === b); }); if (after) after(); }); }
+segClick('typeSeg', 't', 'type', function(){ ui.pick = null; $('pickCov').hidden = true; suggest(); });
+segClick('stSeg', 'st', 'status', function(){ $('addScores').style.display = ui.status === 'towatch' ? 'none' : ''; });
 $('addScores').addEventListener('click', function(e){ var b = e.target.closest('.sc'); if (!b) return; ui.score = ui.score === b.dataset.s ? '' : b.dataset.s; paintScores(); });
 function paintScores(){ Array.prototype.forEach.call($('addScores').children, function(x){ x.classList.toggle('on', x.dataset.s === ui.score); }); }
 var sgTimer = null, sgSeq = 0;
@@ -181,47 +202,76 @@ $('addBtn').onclick = addItem;
 $('nameIn').addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); addItem(); } });
 async function addItem(){
   var name = $('nameIn').value.trim(); if (!name){ $('nameIn').focus(); return; }
-  var r = {id: uid(), name: name, type: ui.type, score: ui.score, where: $('whereIn').value.trim(), cover: '', year: '', t: Date.now()};
-  if (ui.pick){ r.cover = ui.pick.cover; r.year = ui.pick.year; }
-  db.rows.push(r); save();
+  var it = {id: newId(), name: name, type: ui.type, cover: ui.pick ? ui.pick.cover : '', year: ui.pick ? String(ui.pick.year || '') : '', where: $('whereIn').value.trim(), status: ui.status, added_by: S.me, created: new Date().toISOString(), scores: {}};
+  if (ui.status === 'rated' && ui.score) it.scores[S.me] = ui.score;
+  S.items.unshift(it); cacheSave();
   $('nameIn').value = ''; $('whereIn').value = ''; ui.pick = null; ui.score = ''; paintScores(); $('pickCov').hidden = true; $('sugg').hidden = true;
-  render();
-  if (!r.cover) autoCover(r);
+  if (it.status !== ui.tab){ setTab(it.status); } else render();
+  var r = await sb.from('shelf_items').insert({id: it.id, name: it.name, type: it.type, cover: it.cover, year: it.year, where_to: it.where, status: it.status});
+  if (r.error){ toast('Could not save: ' + r.error.message, 5000); S.items = S.items.filter(function(x){ return x !== it; }); cacheSave(); render(); return; }
+  if (it.scores[S.me]) await sb.from('shelf_scores').upsert({item_id: it.id, user_email: S.me, score: it.scores[S.me]});
+  if (!it.cover) autoCover(it);
 }
-async function autoCover(r){
-  try { var res = await searchCovers(r.name, r.type); if (res.length){ r.cover = res[0].cover; r.year = r.year || res[0].year; touch(r); save(); render(); } } catch(e){}
+async function autoCover(it){
+  try { var res = await searchCovers(it.name, it.type); if (res.length){ it.cover = res[0].cover; it.year = it.year || String(res[0].year || ''); cacheSave(); render(); await sb.from('shelf_items').update({cover: it.cover, year: it.year, updated_at: new Date().toISOString()}).eq('id', it.id); } } catch(e){}
 }
 
 /* ---------- list ---------- */
 var ORDER = {S:0, A:1, B:2, C:3, '':4};
+function myScore(it){ return it.scores[S.me] || ''; }
 function shown(){
   var q = ui.q.toLowerCase();
-  var l = db.rows.filter(function(r){ return (ui.filterType === 'all' || r.type === ui.filterType) && (ui.filterScore === 'all' || r.score === ui.filterScore) && (!q || r.name.toLowerCase().includes(q) || (r.where || '').toLowerCase().includes(q)); });
+  var l = S.items.filter(function(r){ return r.status === ui.tab && (ui.filterType === 'all' || r.type === ui.filterType) && (ui.filterScore === 'all' || myScore(r) === ui.filterScore) && (ui.by === 'all' || r.added_by === ui.by) && (!q || r.name.toLowerCase().includes(q) || (r.where || '').toLowerCase().includes(q)); });
   l.sort(function(a, b){
     if (ui.sort === 'name') return a.name.localeCompare(b.name);
-    if (ui.sort === 'new') return (b.t || 0) - (a.t || 0);
-    return (ORDER[a.score] - ORDER[b.score]) || a.name.localeCompare(b.name);
+    if (ui.sort === 'new') return (b.created || '').localeCompare(a.created || '');
+    return (ORDER[myScore(a)] - ORDER[myScore(b)]) || a.name.localeCompare(b.name);
   });
   return l;
 }
 function render(){
   var l = shown();
+  $('nRated').textContent = S.items.filter(function(r){ return r.status === 'rated'; }).length;
+  $('nTo').textContent = S.items.filter(function(r){ return r.status === 'towatch'; }).length;
+  var by = $('by'), cur = ui.by;
+  by.innerHTML = '<option value="all">Added by: anyone</option>' + Object.keys(S.people).map(function(e){ return '<option value="' + esc(e) + '">' + esc(S.people[e]) + '</option>'; }).join(''); by.value = cur;
   $('list').innerHTML = l.length ? l.map(function(r){
-    return '<div class="row" data-id="' + r.id + '"><button type="button" class="cov" data-a="cover" title="Change cover">' + (r.cover ? '<img class="cov" src="' + esc(r.cover) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : '<span class="cov" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center">no cover</span>') + '</button>' +
-      '<div class="info"><input class="nm" data-f="name" value="' + esc(r.name) + '"><div class="meta">' + (r.type === 'manga' ? 'Manga' : 'Anime') + (r.year ? ' · ' + esc(r.year) : '') + '</div></div>' +
-      '<button type="button" class="chip ' + esc(r.score) + '" data-a="score" title="Tap to change score">' + (r.score || '?') + '</button>' +
+    var mine = myScore(r);
+    var others = Object.keys(r.scores).filter(function(e){ return e !== S.me; }).map(function(e){ return '<span class="oth" title="' + esc(nameOf(e)) + '\'s score">' + esc(nameOf(e)) + ' <b class="' + esc(r.scores[e]) + '">' + esc(r.scores[e]) + '</b></span>'; }).join('');
+    var right = r.status === 'towatch' ? '<button type="button" class="watched" data-a="watched">Done ✓</button>' : '<div class="scoreblock"><button type="button" class="chip ' + esc(mine) + '" data-a="score" title="Tap to set your score">' + (mine || '?') + '</button>' + others + '</div>';
+    return '<div class="row" data-id="' + esc(r.id) + '"><button type="button" class="cov" data-a="cover" title="Change cover">' + (r.cover ? '<img class="cov" src="' + esc(r.cover) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : '<span class="cov" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center">no cover</span>') + '</button>' +
+      '<div class="info"><input class="nm" data-f="name" value="' + esc(r.name) + '"><div class="meta">' + (r.type === 'manga' ? 'Manga' : 'Anime') + (r.year ? ' · ' + esc(r.year) : '') + ' · added by ' + esc(nameOf(r.added_by)) + '</div></div>' + right +
       '<input class="wh" data-f="where" list="whereList" placeholder="Where to watch" value="' + esc(r.where || '') + '">' +
-      '<button type="button" class="rm" data-a="del" title="Delete">×</button></div>';
-  }).join('') : '<div class="empty">' + (db.rows.length ? 'Nothing matches the filters.' : 'Your shelf is empty. Type a name above to add your first anime or manga.') + '</div>';
+      (r.added_by === S.me ? '<button type="button" class="rm" data-a="del" title="Delete">×</button>' : '<span></span>') + '</div>';
+  }).join('') : '<div class="empty">' + (S.items.length ? 'Nothing here with these filters.' : 'Nothing yet. Type a name above to add the first one.') + '</div>';
 }
-function rowOf(el){ var d = el.closest('.row'); return d && db.rows.find(function(r){ return r.id === d.dataset.id; }); }
-$('list').addEventListener('click', function(e){
-  var b = e.target.closest('[data-a]'); if (!b) return; var r = rowOf(b); if (!r) return;
-  if (b.dataset.a === 'score'){ var seq = ['S','A','B','C','']; r.score = seq[(seq.indexOf(r.score) + 1) % seq.length]; touch(r); save(); render(); }
-  else if (b.dataset.a === 'del'){ if (confirm('Delete "' + r.name + '"?')){ db.rows = db.rows.filter(function(x){ return x !== r; }); db.del[r.id] = Date.now(); save(); render(); } }
-  else if (b.dataset.a === 'cover') openCovers(r);
+function itemOf(el){ var d = el.closest('.row'); return d && S.items.find(function(r){ return r.id === d.dataset.id; }); }
+$('list').addEventListener('click', async function(e){
+  var b = e.target.closest('[data-a]'); if (!b) return; var r = itemOf(b); if (!r) return;
+  if (b.dataset.a === 'score'){
+    var seq = ['S','A','B','C',''], nx = seq[(seq.indexOf(myScore(r)) + 1) % seq.length];
+    if (nx) r.scores[S.me] = nx; else delete r.scores[S.me]; cacheSave(); render();
+    var q = nx ? await sb.from('shelf_scores').upsert({item_id: r.id, user_email: S.me, score: nx, updated_at: new Date().toISOString()}) : await sb.from('shelf_scores').delete().eq('item_id', r.id).eq('user_email', S.me);
+    if (q.error){ toast('Could not save the score: ' + q.error.message, 5000); refresh(); }
+  } else if (b.dataset.a === 'watched'){
+    r.status = 'rated'; cacheSave(); setTab('rated'); toast('Moved to the shelf. Tap the ? to give your score.');
+    var q2 = await sb.from('shelf_items').update({status: 'rated', updated_at: new Date().toISOString()}).eq('id', r.id); if (q2.error){ toast('Could not save: ' + q2.error.message, 5000); refresh(); }
+  } else if (b.dataset.a === 'del'){
+    if (!confirm('Delete "' + r.name + '" for everyone?')) return;
+    S.items = S.items.filter(function(x){ return x !== r; }); cacheSave(); render();
+    var q3 = await sb.from('shelf_items').delete().eq('id', r.id); if (q3.error){ toast('Could not delete: ' + q3.error.message, 5000); refresh(); }
+  } else if (b.dataset.a === 'cover') openCovers(r);
 });
-$('list').addEventListener('change', function(e){ var f = e.target.dataset.f, r = rowOf(e.target); if (!f || !r) return; r[f] = e.target.value.trim(); touch(r); save(); if (f === 'name' && !r.cover) autoCover(r); });
+$('list').addEventListener('change', async function(e){
+  var f = e.target.dataset.f, r = itemOf(e.target); if (!f || !r) return; var v = e.target.value.trim();
+  if (f === 'name' && !v){ e.target.value = r.name; return; }
+  r[f] = v; cacheSave();
+  var patch = {updated_at: new Date().toISOString()}; patch[f === 'where' ? 'where_to' : f] = v;
+  var q = await sb.from('shelf_items').update(patch).eq('id', r.id); if (q.error){ toast('Could not save: ' + q.error.message, 5000); refresh(); }
+  if (f === 'name' && !r.cover) autoCover(r);
+});
+function setTab(t){ ui.tab = t; Array.prototype.forEach.call($('tabs').children, function(x){ x.classList.toggle('on', x.dataset.tab === t); }); render(); }
+$('tabs').addEventListener('click', function(e){ var b = e.target.closest('.tab'); if (b) setTab(b.dataset.tab); });
 document.querySelector('.filters').addEventListener('click', function(e){
   var p = e.target.closest('.pill'); if (!p) return;
   if (p.dataset.ty){ ui.filterType = p.dataset.ty; } if (p.dataset.sc){ ui.filterScore = p.dataset.sc; }
@@ -230,6 +280,7 @@ document.querySelector('.filters').addEventListener('click', function(e){
 });
 $('q').oninput = function(){ ui.q = this.value; render(); };
 $('sort').onchange = function(){ ui.sort = this.value; render(); };
+$('by').onchange = function(){ ui.by = this.value; render(); };
 
 /* ---------- cover chooser ---------- */
 async function openCovers(r){
@@ -240,59 +291,68 @@ async function openCovers(r){
     $('mGrid')._res = res; $('mGrid')._row = r;
   } catch(e){ $('mGrid').innerHTML = '<div class="empty" style="grid-column:1/-1">Could not reach the cover search right now.</div>'; }
 }
-$('mGrid').addEventListener('click', function(e){ var b = e.target.closest('button'); if (!b) return; var m = $('mGrid')._res[+b.dataset.i], r = $('mGrid')._row; r.cover = m.cover; r.year = m.year || r.year; touch(r); save(); $('modal').hidden = true; render(); });
+$('mGrid').addEventListener('click', async function(e){ var b = e.target.closest('button'); if (!b) return; var m = $('mGrid')._res[+b.dataset.i], r = $('mGrid')._row; r.cover = m.cover; r.year = String(m.year || r.year || ''); cacheSave(); $('modal').hidden = true; render(); await sb.from('shelf_items').update({cover: r.cover, year: r.year, updated_at: new Date().toISOString()}).eq('id', r.id); });
 $('mClose').onclick = function(){ $('modal').hidden = true; };
 $('modal').addEventListener('click', function(e){ if (e.target === $('modal')) $('modal').hidden = true; });
 
-/* ---------- sync (Supabase, same project and allowed list as the Control Room) ---------- */
+/* ---------- Supabase: sign-in, shared tables ---------- */
 var SB_URL = 'https://jsddqdmaatosqvbdrzjo.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzZGRxZG1hYXRvc3F2YmRyempvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc0OTkwMTEsImV4cCI6MjEwMzA3NTAxMX0.sHI2j5w3xjRJhkD9EUqU2l1ZxgW164DqyIdEyGGgAXs';
-var DOC_ID = 'anime-shelf/main', TABLE = 'control_room_docs';
-var sb = null, sess = null, syncState = 'off', syncMsg = '', syncTimer = null, pushing = false;
-function mergeDocs(a, b){
-  var rows = {}, del = {};
-  [a, b].forEach(function(d){ Object.keys(d.del || {}).forEach(function(k){ del[k] = Math.max(del[k] || 0, d.del[k]); }); });
-  [a, b].forEach(function(d){ (d.rows || []).forEach(function(r){ var o = rows[r.id]; if (!o || (r.t || 0) >= (o.t || 0)) rows[r.id] = r; }); });
-  var out = [], seen = {};
-  (a.rows || []).concat(b.rows || []).forEach(function(r){ if (seen[r.id]) return; seen[r.id] = 1; var m = rows[r.id]; if (del[r.id] && del[r.id] >= (m.t || 0)) return; out.push(m); });
-  return {rows: out, del: del};
+var sb = null, sess = null, busy = false, started = false;
+function gate(html){ $('gate').hidden = !html; $('gate').innerHTML = html || ''; $('app').hidden = !!html; }
+function paintUser(){
+  var el = $('syncUi'); if (!sess){ el.innerHTML = ''; return; }
+  el.innerHTML = '<span title="' + esc(sess.user.email || '') + '">☁ ' + esc(nameOf(S.me)) + '</span><button class="linkbtn" id="signOutBtn" type="button">Sign out</button>';
+  $('signOutBtn').onclick = function(){ sb.auth.signOut().then(function(){ location.reload(); }); };
 }
-function same(a, b){ return JSON.stringify(a) === JSON.stringify(b); }
-function syncPaint(){
-  var el = $('syncUi'); if (!sb){ el.textContent = ''; return; }
-  if (!sess){ el.innerHTML = '<button class="btn" id="signInBtn" type="button">Sign in to sync</button>'; $('signInBtn').onclick = function(){ sb.auth.signInWithOAuth({provider:'google', options:{redirectTo: location.origin + location.pathname}}); }; return; }
-  var txt = syncState === 'ok' ? '☁ Synced' : syncState === 'busy' ? '☁ Syncing…' : '⚠ ' + syncMsg;
-  el.innerHTML = '<span title="' + esc(sess.user.email || '') + '">' + esc(txt) + '</span><button class="linkbtn" id="signOutBtn" type="button">Sign out</button>';
-  $('signOutBtn').onclick = function(){ sb.auth.signOut().then(function(){ sess = null; syncPaint(); }); };
-}
-async function syncNow(){
-  if (!sb || !sess || pushing) return; pushing = true; syncState = 'busy'; syncPaint();
+async function refresh(){
+  if (!sb || !sess || busy) return; busy = true;
   try {
-    var got = await sb.from(TABLE).select('value').eq('id', DOC_ID).maybeSingle(); if (got.error) throw got.error;
-    var remote = got.data && got.data.value, merged = remote ? mergeDocs(db, remote) : db;
-    if (!remote || !same(merged, remote)){ var up = await sb.from(TABLE).upsert({id: DOC_ID, value: merged}, {onConflict: 'id'}); if (up.error) throw up.error; }
-    if (!same(merged, db)){ db = merged; try { localStorage.setItem(KEY, JSON.stringify(db)); } catch(e){} var ae = document.activeElement; if (!(ae && ae.closest && ae.closest('#list'))) render(); }
-    syncState = 'ok';
-    // fill in covers that are still missing (e.g. added while offline)
-    db.rows.filter(function(r){ return !r.cover && !r.noCover; }).slice(0, 5).forEach(autoCover);
-  } catch(e){ syncState = 'err'; syncMsg = navigator.onLine ? 'Sync failed, will retry' : 'Offline, will sync later'; }
-  pushing = false; syncPaint();
+    var res = await Promise.all([sb.from('shelf_items').select('*').order('created_at', {ascending: false}), sb.from('shelf_scores').select('*'), sb.rpc('shelf_people')]);
+    res.forEach(function(r){ if (r.error) throw r.error; });
+    var scores = {}; res[1].data.forEach(function(x){ (scores[x.item_id] = scores[x.item_id] || {})[x.user_email] = x.score; });
+    S.items = res[0].data.map(function(x){ return {id: x.id, name: x.name, type: x.type, cover: x.cover || '', year: x.year || '', where: x.where_to || '', status: x.status, added_by: x.added_by, created: x.created_at, scores: scores[x.id] || {}}; });
+    S.people = {}; res[2].data.forEach(function(p){ S.people[p.email] = p.name; });
+    cacheSave(); paintUser();
+    var ae = document.activeElement; if (!(ae && ae.closest && ae.closest('#list'))) render();
+    S.items.filter(function(r){ return !r.cover; }).slice(0, 3).forEach(autoCover);
+  } catch(e){ /* offline: keep showing the cached list */ }
+  busy = false;
 }
-function syncSoon(){ if (!sb || !sess) return; syncState = 'busy'; syncPaint(); clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 700); }
+async function migrateOld(){
+  try {
+    if (localStorage.getItem(MIGRATED)) return;
+    var old = JSON.parse(localStorage.getItem(OLD_KEY) || 'null'); if (!old || !old.rows || !old.rows.length){ localStorage.setItem(MIGRATED, '1'); return; }
+    for (var r of old.rows){
+      var id = newId();
+      var q = await sb.from('shelf_items').insert({id: id, name: r.name, type: r.type || 'anime', cover: r.cover || '', year: String(r.year || ''), where_to: r.where || '', status: 'rated'}); if (q.error) throw q.error;
+      if (r.score) await sb.from('shelf_scores').upsert({item_id: id, user_email: S.me, score: r.score});
+    }
+    localStorage.setItem(MIGRATED, '1'); toast('Moved ' + old.rows.length + ' titles from this device to the shared shelf.', 5000);
+  } catch(e){}
+}
 (async function(){
-  if (!(window.supabase && window.supabase.createClient)) return;
+  if (!(window.supabase && window.supabase.createClient)){ gate('<h2>Could not load</h2><p>The sync library did not load. Check your connection and reload.</p>'); return; }
   sb = window.supabase.createClient(SB_URL, SB_KEY, {auth: {persistSession: true, detectSessionInUrl: true, flowType: 'pkce'}});
   try { sess = (await sb.auth.getSession()).data.session; } catch(e){}
-  if (sess){
-    var ok = await sb.rpc('is_control_room_member');
-    if (ok.error || ok.data !== true){ syncState = 'err'; syncMsg = (sess.user.email || 'This account') + ' is not on the allowed list'; syncPaint(); return; }
-    syncNow(); setInterval(syncNow, 30000);
-    document.addEventListener('visibilitychange', function(){ if (!document.hidden) syncNow(); });
-    window.addEventListener('online', syncNow);
+  if (!sess){
+    gate('<h2>Anime Shelf</h2><p>Sign in with Google to see and add to the shared shelf.</p><button class="btn primary" id="signInBtn" type="button">Sign in with Google</button>');
+    $('signInBtn').onclick = function(){ sb.auth.signInWithOAuth({provider: 'google', options: {redirectTo: location.origin + location.pathname}}); };
+    return;
   }
-  syncPaint();
+  S.me = (sess.user.email || '').toLowerCase();
+  var ok = await sb.rpc('is_shelf_member');
+  if (ok.error && S.items.length){ gate(''); render(); paintUser(); return; } // offline, show the cached list
+  if (ok.error || ok.data !== true){
+    gate('<h2>Not on the list</h2><p>The Google account ' + esc(S.me) + ' is not allowed on this shelf yet. Ask the owner to add it, or sign in with a different account.</p><button class="btn" id="outBtn" type="button">Sign out</button>');
+    $('outBtn').onclick = function(){ sb.auth.signOut().then(function(){ location.reload(); }); }; return;
+  }
+  gate(''); render(); paintUser();
+  await migrateOld(); await refresh(); started = true;
+  setInterval(refresh, 30000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) refresh(); });
+  window.addEventListener('online', refresh);
 })();
-render();
 </script>
 </body>
 </html>
