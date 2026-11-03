@@ -2,6 +2,9 @@
 
 All notable changes to Anime Shelf, newest first. The version number is also shown in the app header.
 
+## 2.1.0 - 2026-11-03
+- Anime and manga now have different row colours so you can tell them apart at a glance: a soft blue with a blue edge for anime, a soft warm orange with an orange edge for manga (darker versions in dark mode).
+
 ## 2.0.0 - 2026-11-03
 - Shared shelf: you and a friend now use the same list. Each title records who added it, and every person gives their own score. Your score is the big badge you tap to change; other people's scores show next to it with their name.
 - New "To watch / read" list for future reference. Add a title as "To watch / read" (no score needed) and tap "Done" when you have seen it to move it to the shelf.

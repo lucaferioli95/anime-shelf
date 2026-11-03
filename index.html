@@ -11,8 +11,8 @@
 <style>
 [hidden]{display:none!important}
 :root{--bg:#f6f3fb;--surface:#fff;--fg:#1b1630;--muted:#6b6785;--line:#ded9ec;--accent:#ff6b6b;--accent-fg:#fff;--danger:#c23a3a;
- --S:#f2b84b;--A:#3fae7a;--B:#4a90d9;--C:#9a97ad;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-@media (prefers-color-scheme:dark){:root{--bg:#120f21;--surface:#1c1733;--fg:#ece9f6;--muted:#9a96b3;--line:#2f2850;--danger:#ef7a7a;color-scheme:dark}}
+ --anime:#e8f0ff;--anime-line:#9db8f0;--manga:#fff0e2;--manga-line:#f0b987;--S:#f2b84b;--A:#3fae7a;--B:#4a90d9;--C:#9a97ad;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#120f21;--surface:#1c1733;--fg:#ece9f6;--muted:#9a96b3;--line:#2f2850;--danger:#ef7a7a;--anime:#1c2745;--anime-line:#3b5393;--manga:#3a2619;--manga-line:#8a5a35;color-scheme:dark}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 var(--font)}
 button,input,select{font:inherit;color:inherit}
@@ -49,6 +49,8 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
 .pill.on{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .list{display:grid;gap:8px}
 .row{display:grid;grid-template-columns:48px 1fr 58px minmax(100px,190px) 28px;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.row.t-anime{background:var(--anime);border-color:var(--anime-line);border-left:5px solid var(--anime-line)}
+.row.t-manga{background:var(--manga);border-color:var(--manga-line);border-left:5px solid var(--manga-line)}
 .row .cov{width:48px;height:68px;border:0;padding:0;display:block}
 .row .nm{border:0;background:none;font-weight:600;width:100%;padding:4px 2px;font-size:16px}
 .row .meta{font-size:12px;color:var(--muted);padding:0 2px}
@@ -132,7 +134,7 @@ main{max-width:980px;margin:0 auto;padding:6px 16px 80px}
 <script src="install.js"></script>
 <script src="supabase.js"></script>
 <script>
-var APP_VERSION = '2.0.0';
+var APP_VERSION = '2.1.0';
 var $ = function(id){ return document.getElementById(id); };
 $('ver').textContent = 'v' + APP_VERSION; $('ver2').textContent = APP_VERSION;
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
@@ -239,7 +241,7 @@ function render(){
     var mine = myScore(r);
     var others = Object.keys(r.scores).filter(function(e){ return e !== S.me; }).map(function(e){ return '<span class="oth" title="' + esc(nameOf(e)) + '\'s score">' + esc(nameOf(e)) + ' <b class="' + esc(r.scores[e]) + '">' + esc(r.scores[e]) + '</b></span>'; }).join('');
     var right = r.status === 'towatch' ? '<button type="button" class="watched" data-a="watched">Done ✓</button>' : '<div class="scoreblock"><button type="button" class="chip ' + esc(mine) + '" data-a="score" title="Tap to set your score">' + (mine || '?') + '</button>' + others + '</div>';
-    return '<div class="row" data-id="' + esc(r.id) + '"><button type="button" class="cov" data-a="cover" title="Change cover">' + (r.cover ? '<img class="cov" src="' + esc(r.cover) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : '<span class="cov" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center">no cover</span>') + '</button>' +
+    return '<div class="row t-' + esc(r.type) + '" data-id="' + esc(r.id) + '"><button type="button" class="cov" data-a="cover" title="Change cover">' + (r.cover ? '<img class="cov" src="' + esc(r.cover) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'">' : '<span class="cov" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;text-align:center">no cover</span>') + '</button>' +
       '<div class="info"><input class="nm" data-f="name" value="' + esc(r.name) + '"><div class="meta">' + (r.type === 'manga' ? 'Manga' : 'Anime') + (r.year ? ' · ' + esc(r.year) : '') + ' · added by ' + esc(nameOf(r.added_by)) + '</div></div>' + right +
       '<input class="wh" data-f="where" list="whereList" placeholder="Where to watch" value="' + esc(r.where || '') + '">' +
       (r.added_by === S.me ? '<button type="button" class="rm" data-a="del" title="Delete">×</button>' : '<span></span>') + '</div>';
